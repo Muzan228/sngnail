@@ -1,0 +1,58 @@
+{
+    "users": {
+        "628854840": {
+            "points": 0,
+            "visits": 0,
+            "referrals": 0,
+            "name": "ᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠ",
+            "username": "A1lgod",
+            "ref_code": "74d524eb"
+        },
+        "8297660584": {
+            "points": 0,
+            "visits": 0,
+            "referrals": 0,
+            "name": "DagPower",
+            "username": "karimskii",
+            "ref_code": "221cb5da"
+        }
+    },
+    "appointments": [
+        {
+            "user_id": 628854840,
+            "name": "ᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠ",
+            "service": "Педикюр",
+            "slot": "2026-05-10 10:00",
+            "created_at": "2026-05-09 20:00:04.127826",
+            "reminded": false
+        },
+        {
+            "user_id": 8297660584,
+            "name": "DagPower",
+            "service": "Маникюр",
+            "slot": "2026-05-11 10:00",
+            "created_at": "2026-05-09 20:01:01.909336",
+            "reminded": false
+        },
+        {
+            "user_id": 628854840,
+            "name": "ᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠ",
+            "service": "Покрытие гель-лак",
+            "slot": "2026-05-10 16:00",
+            "created_at": "2026-05-09 20:09:11.142484",
+            "reminded": false
+        },
+        {
+            "user_id": 628854840,
+            "name": "ᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠᅠ",
+            "contact": "karina marik\n@A1lgod\n+79955605600",
+            "service": "Маникюр",
+            "slot": "2026-05-11 14:00",
+            "created_at": "2026-05-09 20:33:34.353098",
+            "reminded_day": false,
+            "reminded_2h": false
+        }
+    ],
+    "reviews": [],
+    "broadcasts": []
+}
