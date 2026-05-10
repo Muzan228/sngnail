@@ -423,14 +423,12 @@ async def portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def promotions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        text = (
-            "🎁 Актуальные акции:\n\n"
-            "✨ Маникюр + покрытие = скидка 15%\n"
-            "✨ Приведи подругу и получи бонусный балл\n"
-            "✨ Каждое 10-е покрытие бесплатно"
-        )
+        data = load_data()
+        promo = data.get("promo", "Акций пока нет.")
 
-        await update.message.reply_text(text)
+        await update.message.reply_text(
+            f"🎁 Актуальные акции:\n\n{promo}"
+        )
 
     except Exception as e:
         logger.error(f"Ошибка акций: {e}")
@@ -654,6 +652,12 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Ошибка broadcast: {e}")
 
+        app.add_handler(CommandHandler("addslot", addslot))
+app.add_handler(CommandHandler("deleteslot", deleteslot))
+app.add_handler(CommandHandler("listslots", listslots))
+app.add_handler(CommandHandler("setprice", setprice))
+app.add_handler(CommandHandler("setpromo", setpromo))
+
 # =========================
 # НАПОМИНАНИЯ
 # =========================
@@ -707,6 +711,198 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(msg="Exception:", exc_info=context.error)
+
+    # =========================
+# УПРАВЛЕНИЕ СЛОТАМИ
+# =========================
+
+async def addslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "Использование:\n"
+                "/addslot 2026-05-15 10:00"
+            )
+            return
+
+        slot = " ".join(context.args)
+
+        # Проверяем формат
+        try:
+            datetime.strptime(slot, "%Y-%m-%d %H:%M")
+        except ValueError:
+            await update.message.reply_text(
+                "❌ Неверный формат!\n"
+                "Пример: /addslot 2026-05-15 10:00"
+            )
+            return
+
+        # Проверяем что слот не дублируется
+        if slot in AVAILABLE_SLOTS:
+            await update.message.reply_text(
+                f"❌ Слот {slot} уже существует!"
+            )
+            return
+
+        AVAILABLE_SLOTS.append(slot)
+        AVAILABLE_SLOTS.sort()
+
+        await update.message.reply_text(
+            f"✅ Слот добавлен: {slot}\n\n"
+            f"📅 Всего слотов: {len(AVAILABLE_SLOTS)}"
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка addslot: {e}")
+
+
+async def deleteslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        if not context.args:
+            # Показываем все слоты с кнопками
+            if not AVAILABLE_SLOTS:
+                await update.message.reply_text("❌ Нет доступных слотов.")
+                return
+
+            text = "📅 Доступные слоты:\n\n"
+            for i, slot in enumerate(AVAILABLE_SLOTS, 1):
+                text += f"{i}. {slot}\n"
+            text += "\nИспользование:\n/deleteslot 2026-05-15 10:00"
+
+            await update.message.reply_text(text)
+            return
+
+        slot = " ".join(context.args)
+
+        if slot not in AVAILABLE_SLOTS:
+            await update.message.reply_text(
+                f"❌ Слот {slot} не найден!"
+            )
+            return
+
+        AVAILABLE_SLOTS.remove(slot)
+
+        await update.message.reply_text(
+            f"✅ Слот удалён: {slot}\n\n"
+            f"📅 Осталось слотов: {len(AVAILABLE_SLOTS)}"
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка deleteslot: {e}")
+
+
+async def listslots(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        if not AVAILABLE_SLOTS:
+            await update.message.reply_text("❌ Нет доступных слотов.")
+            return
+
+        text = "📅 Все доступные слоты:\n\n"
+        for slot in AVAILABLE_SLOTS:
+            text += f"• {slot}\n"
+
+        await update.message.reply_text(text)
+
+    except Exception as e:
+        logger.error(f"Ошибка listslots: {e}")
+
+
+# =========================
+# УПРАВЛЕНИЕ ЦЕНАМИ
+# =========================
+
+async def setprice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        if len(context.args) < 2:
+            text = (
+                "Использование:\n"
+                "/setprice Маникюр 3000\n\n"
+                "📋 Текущие цены:\n\n"
+            )
+            for service, price in SERVICES.items():
+                text += f"• {service} — {price}₽\n"
+
+            await update.message.reply_text(text)
+            return
+
+        # Последний аргумент — цена, остальное — название услуги
+        price_str = context.args[-1]
+        service = " ".join(context.args[:-1])
+
+        try:
+            price = int(price_str)
+        except ValueError:
+            await update.message.reply_text(
+                "❌ Цена должна быть числом!\n"
+                "Пример: /setprice Маникюр 3000"
+            )
+            return
+
+        if service not in SERVICES:
+            text = (
+                f"❌ Услуга '{service}' не найдена!\n\n"
+                "Доступные услуги:\n"
+            )
+            for s in SERVICES:
+                text += f"• {s}\n"
+            await update.message.reply_text(text)
+            return
+
+        old_price = SERVICES[service]
+        SERVICES[service] = price
+
+        await update.message.reply_text(
+            f"✅ Цена обновлена!\n\n"
+            f"💅 Услуга: {service}\n"
+            f"💰 Было: {old_price}₽\n"
+            f"💰 Стало: {price}₽"
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка setprice: {e}")
+
+
+# =========================
+# УПРАВЛЕНИЕ АКЦИЯМИ
+# =========================
+
+async def setpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        if not context.args:
+            await update.message.reply_text(
+                "Использование:\n"
+                "/setpromo Скидка 20% на маникюр весь май!"
+            )
+            return
+
+        text = " ".join(context.args)
+
+        data = load_data()
+        data["promo"] = text
+        save_data(data)
+
+        await update.message.reply_text(
+            f"✅ Акция обновлена!\n\n"
+            f"🎁 {text}"
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка setpromo: {e}")
 
 # =========================
 # MAIN
