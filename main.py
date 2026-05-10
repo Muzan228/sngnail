@@ -798,14 +798,14 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("help", help_command))
-app.add_handler(
-    MessageHandler(
-        filters.Regex("^❓ Помощь$"),
-        help_command
+    app.add_handler(
+        MessageHandler(
+            filters.Regex("^❓ Помощь$"),
+            help_command
+        )
     )
-)
 
-  # Reminder
+    # Reminder
     app.job_queue.run_repeating(
         reminder_job,
         interval=3600,
