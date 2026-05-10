@@ -205,6 +205,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 
 async def book_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("BOOK START WORKS")
     try:
         keyboard = []
 
@@ -348,35 +349,7 @@ async def save_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 
-        appointment = {
-            "user_id": query.from_user.id,
-            "name": query.from_user.full_name,
-            "service": service,
-            "slot": slot,
-            "created_at": str(datetime.now()),
-            "reminded": False,
-        }
-
-        data["appointments"].append(appointment)
-        save_data(data)
-
-        await query.message.reply_text(
-            f"✅ Вы успешно записаны!\n\n"
-            f"💅 Услуга: {service}\n"
-            f"📅 Дата: {slot}"
-        )
-
-        await send_admin_notification(
-            context,
-            (
-                f"📥 Новая запись!\n\n"
-                f"👤 Клиент: {query.from_user.full_name}\n"
-                f"💅 Услуга: {service}\n"
-                f"📅 Время: {slot}"
-            )
-        )
-
-        return ConversationHandler.END
+       
 
     except Exception as e:
         logger.error(f"Ошибка select_slot: {e}")
@@ -719,27 +692,23 @@ def main():
     booking_handler = ConversationHandler(
     entry_points=[
         MessageHandler(
-            filters.Regex("^💅 Записаться$"),
+            filters.TEXT & filters.Regex("Записаться"),
             book_start
         )
     ],
-
     states={
-
         SELECT_SERVICE: [
             CallbackQueryHandler(
                 select_service,
                 pattern="^service_"
             )
         ],
-
         SELECT_SLOT: [
             CallbackQueryHandler(
                 select_slot,
                 pattern="^slot_"
             )
         ],
-
         ENTER_CONTACT: [
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
@@ -747,7 +716,6 @@ def main():
             )
         ],
     },
-
     fallbacks=[],
 )
 
