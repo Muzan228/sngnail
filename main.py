@@ -91,7 +91,7 @@ MAIN_KEYBOARD = [
     [KeyboardButton("💅 Записаться"), KeyboardButton("📋 Услуги и цены")],
     [KeyboardButton("⭐ Мои баллы"), KeyboardButton("🎁 Акции")],
     [KeyboardButton("📸 Портфолио"), KeyboardButton("📝 Отзывы")],
-    [KeyboardButton("👥 Пригласить друга")],
+    [KeyboardButton("👥 Пригласить друга"), KeyboardButton("❓ Помощь")],
 ]
 
 reply_markup = ReplyKeyboardMarkup(
@@ -464,6 +464,33 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Ошибка referral: {e}")
 
+
+        # =========================
+# ПОМОЩЬ
+# =========================
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        text = (
+            "❓ <b>Помощь</b>\n\n"
+            "💅 <b>Записаться</b> — выбрать дату и время\n"
+            "📋 <b>Услуги и цены</b> — полный прайс\n"
+            "⭐ <b>Мои баллы</b> — программа лояльности\n"
+            "🎁 <b>Акции</b> — текущие скидки\n"
+            "📸 <b>Портфолио</b> — примеры работ\n"
+            "📝 <b>Отзывы</b> — отзывы клиентов\n"
+            "👥 <b>Пригласить друга</b> — реферальная ссылка\n\n"
+            "По всем вопросам пишите мастеру: @username_мастера"
+        )
+
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML",
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка help: {e}")
+
 # =========================
 # ОТЗЫВЫ
 # =========================
@@ -770,6 +797,13 @@ def main():
     app.add_handler(CommandHandler("clients", clients))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("help", help_command))
+app.add_handler(
+    MessageHandler(
+        filters.Regex("^❓ Помощь$"),
+        help_command
+    )
+)
 
     # Reminder
     app.job_queue.run_repeating(
