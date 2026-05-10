@@ -652,12 +652,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Ошибка broadcast: {e}")
 
-        app.add_handler(CommandHandler("addslot", addslot))
-app.add_handler(CommandHandler("deleteslot", deleteslot))
-app.add_handler(CommandHandler("listslots", listslots))
-app.add_handler(CommandHandler("setprice", setprice))
-app.add_handler(CommandHandler("setpromo", setpromo))
-
 # =========================
 # НАПОМИНАНИЯ
 # =========================
@@ -993,6 +987,11 @@ def main():
     app.add_handler(CommandHandler("clients", clients))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("addslot", addslot))
+    app.add_handler(CommandHandler("deleteslot", deleteslot))
+    app.add_handler(CommandHandler("listslots", listslots))
+    app.add_handler(CommandHandler("setprice", setprice))
+    app.add_handler(CommandHandler("setpromo", setpromo))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(
         MessageHandler(
