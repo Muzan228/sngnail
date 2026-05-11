@@ -527,27 +527,69 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         data = load_data()
-
         today = datetime.now().strftime("%Y-%m-%d")
 
-        text = "📅 Записи на сегодня:\n\n"
+        days = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
+        months = ["","янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"]
+        dt = datetime.now()
+        date_label = f"{days[dt.weekday()]}, {dt.day} {months[dt.month]}"
 
-        found = False
+        today_apps = [a for a in data["appointments"] if today in a["slot"]]
 
-        for app in data["appointments"]:
-            if today in app["slot"]:
-                found = True
+        if not today_apps:
+            await update.message.reply_text(
+                f"📋 Записи на сегодня — {date_label}\n\nЗаписей нет."
+            )
+            return
 
-                text += (
-                    f"👤 {app['name']}\n"
-                    f"💅 {app['service']}\n"
-                    f"🕐 {app['slot']}\n\n"
-                )
+        total_sum = 0
+        cancelled = 0
 
-        if not found:
-            text += "Нет записей."
+        for app in today_apps:
+            status = app.get("status", "new")
+            service = app.get("service", "")
+            price = data.get("services", SERVICES).get(service, 0)
+            name = app.get("name", "Клиент")
+            contact = app.get("contact", "—")
+            slot = app.get("slot", "")
+            time = slot.split(" ")[1] if " " in slot else slot
 
-        await update.message.reply_text(text)
+            if status == "new":
+                status_badge = "🆕 Новая"
+            elif status == "confirmed":
+                status_badge = "✅ Подтверждена"
+                total_sum += price
+            elif status == "cancelled":
+                status_badge = "❌ Отменена"
+                cancelled += 1
+            else:
+                status_badge = "🕐 Ожидает"
+                total_sum += price
+
+            text = (
+                f"{status_badge}\n"
+                f"👤 {name}\n"
+                f"💅 {service} — {price}₽\n"
+                f"🕐 {time}  ·  {contact}"
+            )
+
+            keyboard = []
+            if status not in ["confirmed", "cancelled"]:
+                keyboard.append([
+                    InlineKeyboardButton("✅ Подтвердить", callback_data=f"confirm_{app['slot']}_{app['user_id']}"),
+                    InlineKeyboardButton("❌ Отменить", callback_data=f"cancel_{app['slot']}_{app['user_id']}")
+                ])
+
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            )
+
+        await update.message.reply_text(
+            f"📋 Итого — {date_label}\n"
+            f"💰 Выручка: {total_sum}₽\n"
+            f"📊 Записей: {len(today_apps)}  ·  Отмен: {cancelled}"
+        )
 
     except Exception as e:
         logger.error(f"Ошибка admin: {e}")
@@ -563,15 +605,55 @@ async def clients(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data = load_data()
 
-        text = "👥 Клиенты:\n\n"
+        if not data["users"]:
+            await update.message.reply_text("👥 Клиентов пока нет.")
+            return
 
-        for user_id, user in data["users"].items():
-            text += (
-                f"👤 {user['name']}\n"
-                f"⭐ Баллы: {user['points']}\n\n"
+        sorted_clients = sorted(
+            data["users"].items(),
+            key=lambda x: x[1].get("visits", 0),
+            reverse=True
+        )
+
+        await update.message.reply_text(
+            f"👥 База клиентов — {len(sorted_clients)} человек"
+        )
+
+        months = ["","янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"]
+
+        for user_id, user in sorted_clients:
+            name = user.get("name", "Без имени")
+            initials = "".join([w[0].upper() for w in name.split()[:2]])
+            contact = f"@{user['username']}" if user.get("username") else "—"
+            visits = user.get("visits", 0)
+            points = user.get("points", 0)
+
+            last_visit = "—"
+            user_apps = [a for a in data["appointments"] if str(a.get("user_id")) == str(user_id)]
+            if user_apps:
+                last_slot = sorted(user_apps, key=lambda x: x["slot"])[-1]["slot"]
+                try:
+                    ldt = datetime.strptime(last_slot, "%Y-%m-%d %H:%M")
+                    last_visit = f"{ldt.day} {months[ldt.month]}"
+                except:
+                    last_visit = last_slot
+
+            text = (
+                f"[{initials}] {name}\n"
+                f"📞 {contact}\n"
+                f"🗓 Последний визит: {last_visit}\n"
+                f"💎 Визитов: {visits}  ·  ⭐ Баллов: {points}"
             )
 
-        await update.message.reply_text(text)
+            await update.message.reply_text(text)
+
+        top = sorted_clients[0]
+        top_name = top[1].get("name", "—")
+        top_visits = top[1].get("visits", 0)
+
+        await update.message.reply_text(
+            f"🏆 Топ клиент: {top_name} — {top_visits} визитов"
+        )
 
     except Exception as e:
         logger.error(f"Ошибка clients: {e}")
@@ -898,6 +980,58 @@ async def setpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Ошибка setpromo: {e}")
 
+
+async def confirm_cancel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        query = update.callback_query
+        await query.answer()
+
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        parts = query.data.split("_", 2)
+        action = parts[0]
+        slot = parts[1] + "_" + parts[2].split("_")[0] if len(parts) > 2 else ""
+
+        data_parts = query.data.split("_")
+        action = data_parts[0]
+        user_id = data_parts[-1]
+        slot = "_".join(data_parts[1:-1])
+
+        data = load_data()
+
+        for app in data["appointments"]:
+            if app["slot"] == slot and str(app["user_id"]) == str(user_id):
+                if action == "confirm":
+                    app["status"] = "confirmed"
+                    status_text = "✅ Запись подтверждена"
+                    client_text = f"✅ Ваша запись подтверждена!\n\n💅 {app['service']}\n📅 {app['slot']}"
+                elif action == "cancel":
+                    app["status"] = "cancelled"
+                    status_text = "❌ Запись отменена"
+                    client_text = f"❌ Ваша запись отменена.\n\n💅 {app['service']}\n📅 {app['slot']}\n\nДля новой записи нажмите 💅 Записаться"
+                else:
+                    return
+
+                save_data(data)
+
+                await query.edit_message_text(
+                    query.message.text + f"\n\n{status_text}"
+                )
+
+                try:
+                    await context.bot.send_message(
+                        chat_id=int(user_id),
+                        text=client_text,
+                        reply_markup=reply_markup
+                    )
+                except Exception:
+                    pass
+                return
+
+    except Exception as e:
+        logger.error(f"Ошибка confirm_cancel: {e}")        
+
 # =========================
 # MAIN
 # =========================
@@ -913,6 +1047,8 @@ def main():
             book_start
         )
     ],
+
+    
     states={
         SELECT_SERVICE: [
             CallbackQueryHandler(
@@ -982,6 +1118,9 @@ def main():
         )
     )
 
+
+
+
     # Админ
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(CommandHandler("clients", clients))
@@ -997,6 +1136,12 @@ def main():
         MessageHandler(
             filters.Regex("^❓ Помощь$"),
             help_command
+        )
+    )
+
+    app.add_handler(CallbackQueryHandler(
+                confirm_cancel_handler,
+                pattern="^confirm_|^cancel_"
         )
     )
 
