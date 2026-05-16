@@ -237,6 +237,39 @@ async def api_admin_cancel(request):
         return web.json_response({"ok": False, "error": str(e)}, status=500)
 
 
+# ── POST /api/admin/addslot ──
+async def api_admin_addslot(request):
+    try:
+        body = await request.json()
+        admin_id = body.get("admin_id", 0)
+        slot = body.get("slot")
+        if int(admin_id) not in ADMIN_IDS:
+            return web.json_response({"ok": False, "error": "Forbidden"}, status=403)
+        if not slot:
+            return web.json_response({"ok": False, "error": "No slot"}, status=400)
+        if slot not in AVAILABLE_SLOTS:
+            AVAILABLE_SLOTS.append(slot)
+            AVAILABLE_SLOTS.sort()
+        return web.json_response({"ok": True, "slots": AVAILABLE_SLOTS})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
+# ── POST /api/admin/deleteslot ──
+async def api_admin_deleteslot(request):
+    try:
+        body = await request.json()
+        admin_id = body.get("admin_id", 0)
+        slot = body.get("slot")
+        if int(admin_id) not in ADMIN_IDS:
+            return web.json_response({"ok": False, "error": "Forbidden"}, status=403)
+        if slot in AVAILABLE_SLOTS:
+            AVAILABLE_SLOTS.remove(slot)
+        return web.json_response({"ok": True, "slots": AVAILABLE_SLOTS})
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
 # ── ЗАПУСК API ──
 async def run_api(bot_app=None):
     if bot_app:
@@ -250,6 +283,8 @@ async def run_api(bot_app=None):
     app.router.add_get('/api/admin/data', api_admin_data)
     app.router.add_post('/api/admin/confirm', api_admin_confirm)
     app.router.add_post('/api/admin/cancel', api_admin_cancel)
+    app.router.add_post('/api/admin/addslot', api_admin_addslot)
+    app.router.add_post('/api/admin/deleteslot', api_admin_deleteslot)
 
     runner = web.AppRunner(app)
     await runner.setup()
