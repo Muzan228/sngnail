@@ -2,6 +2,7 @@
 
 import os
 import json
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from uuid import uuid4
@@ -34,6 +35,9 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+
+# Список всех админов (основной + дополнительные)
+ADMIN_IDS = [ADMIN_ID, 628854840]
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не найден в .env")
@@ -156,19 +160,21 @@ def get_user(data, user_id):
 
 def slot_taken(data, slot):
     for appointment in data["appointments"]:
-        if appointment["slot"] == slot:
+        # Слот занят только если запись не отменена
+        if appointment["slot"] == slot and appointment.get("status", "new") != "cancelled":
             return True
     return False
 
 
 async def send_admin_notification(context, text):
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=text,
-        )
-    except Exception as e:
-        logger.error(f"Ошибка отправки админу: {e}")
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=text,
+            )
+        except Exception as e:
+            logger.error(f"Ошибка отправки админу {admin_id}: {e}")
 
 # =========================
 # START
@@ -523,7 +529,7 @@ async def reviews(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         data = load_data()
@@ -600,7 +606,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def clients(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         data = load_data()
@@ -664,7 +670,7 @@ async def clients(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         data = load_data()
@@ -700,7 +706,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if not context.args:
@@ -794,7 +800,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 async def addslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if not context.args:
@@ -837,7 +843,7 @@ async def addslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def deleteslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if not context.args:
@@ -875,7 +881,7 @@ async def deleteslot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def listslots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if not AVAILABLE_SLOTS:
@@ -898,7 +904,7 @@ async def listslots(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def setprice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if len(context.args) < 2:
@@ -956,7 +962,7 @@ async def setprice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def setpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         if not context.args:
@@ -986,7 +992,7 @@ async def confirm_cancel_handler(update: Update, context: ContextTypes.DEFAULT_T
         query = update.callback_query
         await query.answer()
 
-        if update.effective_user.id != ADMIN_ID:
+        if update.effective_user.id not in ADMIN_IDS:
             return
 
         parts = query.data.split("_", 2)
@@ -1038,7 +1044,6 @@ async def confirm_cancel_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
-
     # Запись
     booking_handler = ConversationHandler(
     entry_points=[
@@ -1156,6 +1161,12 @@ def main():
 
     print("Бот запущен...")
 
+    # Запускаем API сервер параллельно с ботом
+    async def post_init(application):
+        from api_server import run_api
+        asyncio.create_task(run_api(application))
+
+    app.post_init = post_init
     app.run_polling()
 
 # =========================
